@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GigaPan — オフライン閲覧</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#171b20;color:#fff;font:14px system-ui,sans-serif}
+  #view{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none}
+  #view.dragging{cursor:grabbing}
+  #tiles{position:absolute;inset:0;pointer-events:none}
+  .tile{position:absolute;image-rendering:auto}
+  #bar{position:absolute;top:14px;left:14px;display:flex;gap:6px;align-items:center;padding:8px;background:#111d;border-radius:9px;box-shadow:0 2px 10px #0008}
+  button{background:#33404b;color:white;border:1px solid #66717b;border-radius:5px;padding:6px 10px;cursor:pointer;font:inherit}
+  button:hover{background:#4c5b68}
+  #title{margin-left:6px;max-width:min(45vw,500px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #help{position:absolute;right:14px;bottom:14px;background:#111d;padding:7px 10px;border-radius:6px;color:#dde3e8}
+</style>
+<div id="view"><div id="tiles"></div></div>
+<div id="bar"><button id="out" title="縮小">−</button><button id="fit" title="全体表示">全体</button><button id="in" title="拡大">＋</button><span id="title">GigaPan</span></div>
+<div id="help">ドラッグで移動・ホイールで拡大縮小</div>
+<script type="application/json" id="panorama-data">__PANORAMA_JSON__</script>
+<script>
+const data=JSON.parse(document.getElementById("panorama-data").textContent);
+const W=data.width,H=data.height,MAX=data.levels-1,T=256;
+document.getElementById("title").textContent=data.name+(data.status==="complete"?"":"（未完了の保存版）");
+const view=document.getElementById('view'),tiles=document.getElementById('tiles');
+let scale=1,ox=0,oy=0,drag=null,shown=new Map(),level=-1;
+function name(z,x,y){
+  let q='';for(let bit=z-1;bit>=0;bit--)q+=((x>>bit)&1)|(((y>>bit)&1)<<1);
+  let parts=[];if(q.length>=3)parts.push('r'+q.slice(0,2));
+  for(let start=2;start<q.length-3;start+=3)parts.push(q.slice(start,start+3));
+  return 'tiles/'+parts.concat('r'+q+'.jpg').join('/');
+}
+function render(){
+  const rect=view.getBoundingClientRect();
+  const z=Math.max(0,Math.min(MAX,Math.round(MAX+Math.log2(scale))));
+  const factor=2**(MAX-z), step=T*factor;
+  const maxX=Math.ceil(W/step),maxY=Math.ceil(H/step);
+  const x0=Math.max(0,Math.floor(-ox/(scale*step))-1), x1=Math.min(maxX-1,Math.floor((rect.width-ox)/(scale*step))+1);
+  const y0=Math.max(0,Math.floor(-oy/(scale*step))-1), y1=Math.min(maxY-1,Math.floor((rect.height-oy)/(scale*step))+1);
+  const wanted=new Set();
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+    const key=z+':'+x+':'+y;wanted.add(key);
+    let img=shown.get(key);
+    if(!img){img=document.createElement('img');img.className='tile';img.alt='';img.decoding='async';img.src=name(z,x,y);tiles.appendChild(img);shown.set(key,img)}
+    img.style.left=(ox+x*step*scale)+'px';img.style.top=(oy+y*step*scale)+'px';
+    img.style.width=(step*scale)+'px';img.style.height=(step*scale)+'px';
+    const right=Math.max(0,(x+1)*step-W)*scale,bottom=Math.max(0,(y+1)*step-H)*scale;
+    img.style.clipPath=`inset(0px ${right}px ${bottom}px 0px)`;
+  }
+  for(const [key,img] of shown)if(!wanted.has(key)){img.remove();shown.delete(key)}
+  level=z;
+}
+function fit(){const rect=view.getBoundingClientRect();scale=Math.min(rect.width/W,rect.height/H);ox=(rect.width-W*scale)/2;oy=(rect.height-H*scale)/2;render()}
+function zoom(mult,cx,cy){const next=Math.max(Math.min(view.clientWidth/W,view.clientHeight/H)/2,Math.min(2,scale*mult));ox=cx-(cx-ox)*next/scale;oy=cy-(cy-oy)*next/scale;scale=next;render()}
+view.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,ox,oy};view.setPointerCapture(e.pointerId);view.classList.add('dragging')});
+view.addEventListener('pointermove',e=>{if(!drag)return;ox=drag.ox+e.clientX-drag.x;oy=drag.oy+e.clientY-drag.y;render()});
+view.addEventListener('pointerup',()=>{drag=null;view.classList.remove('dragging')});
+view.addEventListener('pointercancel',()=>{drag=null;view.classList.remove('dragging')});
+view.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY<0?1.25:0.8,e.clientX,e.clientY)},{passive:false});
+document.getElementById('in').onclick=()=>zoom(1.6,view.clientWidth/2,view.clientHeight/2);
+document.getElementById('out').onclick=()=>zoom(1/1.6,view.clientWidth/2,view.clientHeight/2);
+document.getElementById('fit').onclick=fit;
+window.addEventListener('resize',fit);fit();
+</script>
+</html>

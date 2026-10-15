@@ -1,0 +1,90 @@
+name: Salvage GigaPan
+run-name: 'GigaPan ${{ inputs.gigapan_id || github.event.issue.title }}'
+on:
+  workflow_dispatch:
+    inputs:
+      gigapan_id:
+        description: GigaPan ID（例 76564）
+        required: true
+        type: string
+      mode:
+        description: full は全タイル、probe はメタデータと1枚だけの通信確認
+        required: true
+        default: full
+        type: choice
+        options: [full, probe]
+      width:
+        description: API 停止時の補助・画像の横幅（任意）
+        type: string
+      height:
+        description: API 停止時の補助・画像の高さ（任意）
+        type: string
+  issues:
+    types: [opened, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: salvage-${{ github.event.issue.number || inputs.gigapan_id }}
+  cancel-in-progress: false
+jobs:
+  salvage:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (startsWith(github.event.issue.title, '[Salvage] GigaPan ') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python -m pip install .
+      - name: Validate request and permissions
+        id: request
+        run: python scripts/prepare_request.py
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Restore previously saved tiles
+        id: cache
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: archives/gigapan_${{ steps.request.outputs.id }}
+          key: salvage-v1-${{ steps.request.outputs.id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: salvage-v1-${{ steps.request.outputs.id }}-
+      - name: Download and verify
+        id: rescue
+        continue-on-error: true
+        run: python -u scripts/run_job.py
+      - name: Save archive and report
+        if: always() && steps.request.outcome == 'success'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: gigapan-${{ steps.request.outputs.id }}-${{ github.run_id }}
+          path: |
+            archives/*.tar.gz
+            archives/*.sha256
+            archives/job-result.json
+            archives/gigapan_${{ steps.request.outputs.id }}/audit.json
+            archives/gigapan_${{ steps.request.outputs.id }}/missing_tiles.json
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: warn
+      - name: Report result
+        id: result
+        if: always() && steps.request.outcome == 'success'
+        run: python scripts/finish_job.py
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Keep partial progress for the next run
+        if: always() && steps.result.outputs.cache_ok == 'true'
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: archives/gigapan_${{ steps.request.outputs.id }}
+          key: salvage-v1-${{ steps.request.outputs.id }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Mark incomplete salvage as failed
+        if: always() && steps.rescue.outcome == 'failure'
+        run: exit 1
