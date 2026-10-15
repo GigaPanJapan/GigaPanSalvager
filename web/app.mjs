@@ -25,7 +25,7 @@ $('#kml-file').addEventListener('change',async e=>{
 });
 $('#request-form').addEventListener('submit',e=>{
   e.preventDefault();error('');
-  try{const req=request();const u=issueUrl(config.repository,req);window.open(u,'_blank','noopener,noreferrer');}
+  try{const req=request();const u=issueUrl(config.repository,req);location.assign(u);}
   catch(ex){error(ex.message);}
 });
 $('#copy-command').addEventListener('click',async()=>{
