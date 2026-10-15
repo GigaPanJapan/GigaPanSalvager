@@ -1,5 +1,5 @@
 name: Salvage GigaPan
-run-name: 'GigaPan ${{ inputs.gigapan_id || github.event.issue.title }}'
+run-name: 'GigaPan ${{ inputs.gigapan_id || github.event.issue.title }} · ${{ inputs.mode || github.event_name }}'
 on:
   workflow_dispatch:
     inputs:
