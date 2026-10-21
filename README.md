@@ -2,7 +2,7 @@
 
 GigaPan の公開パノラマを ID または URL で指定し、全解像度の画像タイルと公開資料を手元に保存するツールです。
 
-**[ウェブ画面を開く](https://mapconcierge.github.io/GigaPanSalvager/)** · [救出ジョブ](https://github.com/mapconcierge/GigaPanSalvager/actions/workflows/salvage.yml)
+**[ウェブ画面を開く](https://gigapanjapan.github.io/GigaPanSalvager/)** · [救出ジョブ](https://github.com/gigapanjapan/GigaPanSalvager/actions/workflows/salvage.yml)
 
 GitHub Pages が画面を配信し、GitHub Actions が画像を取得します。追加サーバーやブラウザへのアクセストークン入力は不要です。配信元が応答しない間は救出できません。欠損を記録し、再実行で続きを取得できます。
 
