@@ -28,10 +28,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   salvage:
-if: >-
-  github.event_name == 'workflow_dispatch' ||
-  (github.event_name == 'issues' &&
-   startsWith(github.event.issue.title, '[Salvage] GigaPan '))
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' &&
+       startsWith(github.event.issue.title, '[Salvage] GigaPan '))
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
